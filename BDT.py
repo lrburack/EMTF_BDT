@@ -290,4 +290,4 @@ print("RMSE: %f" % (rmse))
 
 input_vars = [(x, 'I') for x in X.head()]
 for idx, tree in enumerate(xg_reg.get_booster().get_dump()):
-    convert_model([tree],itree = idx,input_variables = input_vars, output_xml=f'/afs/cern.ch/user/n/nhurley/BDT/mode_{MODE}_trees/{idx}.xml')
+    convert_model([tree],itree = idx,input_variables = input_vars, output_xml=f'/afs/cern.ch/user/n/nhurley/BDT/{MODE}/{idx}.xml')
