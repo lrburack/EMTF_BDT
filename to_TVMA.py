@@ -64,7 +64,7 @@ def convert_model(model, itree, input_variables, output_xml):
     BinaryTree = ET.Element("BinaryTree", type="DecisionTree", boostWeight="1.0e+00", itree=str(itree))
 
     # <Variables>
-    Variables = ET.SubElement(BinaryTree, "Variables", NVar=str(len(var_list)))
+ #   Variables = ET.SubElement(BinaryTree, "Variables", NVar=str(len(var_list)))
     for ind, val in enumerate(var_list):
         name = val[0]
         var_type = val[1]
