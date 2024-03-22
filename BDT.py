@@ -23,13 +23,15 @@ args = parser.parse_args()
 MODE = int(args.mode)
 print(MODE)
 
-MAX_FILE = 20
+MAX_FILE = 2 #20
 MAX_EVT = -1
 DEBUG = False
 PRNT_EVT = 10000
 
-folders = ["/afs/cern.ch/user/n/nhurley/CMSSW_12_3_0/src/EMTF_MC_NTuple_SingleMu_new_neg.root", "/afs/cern.ch/user/n/nhurley/CMSSW_12_3_0/src/EMTF_MC_NTuple_SingleMu_pos_new.root"]
-base_dirs = ["/eos/user/n/nhurley/SingleMu/SingleMuFlatOneOverPt1To1000GeV_Ntuple_fixed__negEndcap_v2/221215_114244/0000/", "/eos/user/n/nhurley/SingleMu/SingleMuFlatOneOverPt1To1000GeV_Ntuple_fixed__posEndcap_v2/221215_111111/"]
+#folders = ["/afs/cern.ch/user/n/nhurley/CMSSW_12_3_0/src/EMTF_MC_NTuple_SingleMu_new_neg.root", "/afs/cern.ch/user/n/nhurley/CMSSW_12_3_0/src/EMTF_MC_NTuple_SingleMu_pos_new.root"]
+#base_dirs = ["/eos/user/n/nhurley/SingleMu/SingleMuFlatOneOverPt1To1000GeV_Ntuple_fixed__negEndcap_v2/221215_114244/0000/", "/eos/user/n/nhurley/SingleMu/SingleMuFlatOneOverPt1To1000GeV_Ntuple_fixed__posEndcap_v2/221215_111111/"]
+
+base_dirs = ["/eos/cms/store/user/eyigitba/emtf/L1Ntuples/Run3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_negEndcap_13_3_1_BDT2024_noGEM_10M/240112_135506/0000/", "/eos/cms/store/user/eyigitba/emtf/L1Ntuples/Run3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_posEndcap_13_3_1_BDT2024_noGEM_10M/240112_152929/0000/"]
 
 
 #station-station transitions for delta phi's and theta's
@@ -175,7 +177,7 @@ for event in range(evt_tree.GetEntries()):
 
     #print("\nCompressing...\n")
     features_precompressed = {k:v for k, v in features.items()}
-    features.compress()
+    #features.compress()
     
     if mode == 15:
         #Get dphi sums, must happen post-compression
@@ -235,7 +237,7 @@ for event in range(evt_tree.GetEntries()):
             else:
                 print("No match exists!")
 
-    X = X.append(x_, ignore_index = True)
+    X = pd.concat([X,pd.DataFrame([x_])], ignore_index = True)
     Y = np.append(Y, log(evt_tree.genPart_pt[0]))
     W = np.append(W, 1. / log2(evt_tree.genPart_pt[0] + 0.000001))
 
@@ -287,7 +289,6 @@ rmse = np.sqrt(mean_squared_error(Y_test, preds))
 
 print("RMSE: %f" % (rmse))
 
-
-input_vars = [(x, 'I') for x in X.head()]
-for idx, tree in enumerate(xg_reg.get_booster().get_dump()):
-    convert_model([tree],itree = idx,input_variables = input_vars, output_xml=f'/afs/cern.ch/user/n/nhurley/BDT/{MODE}/{idx}.xml')
+#input_vars = [(x, 'I') for x in X.head()]
+#for idx, tree in enumerate(xg_reg.get_booster().get_dump()):
+#    convert_model([tree],itree = idx,input_variables = input_vars, output_xml=f'/afs/cern.ch/user/n/nhurley/BDT/{MODE}/{idx}.xml')
