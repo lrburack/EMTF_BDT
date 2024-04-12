@@ -76,9 +76,17 @@ break_loop = False
 X = pd.DataFrame()
 Y = np.array([])
 W = np.array([])
+
+Y_eta = np.array([])
+Y_phi = np.array([])
+Y_pt = np.array([])
+
 #we will want to break the loop when debugging and look at a single entry
 event_break = False    
 #loop through all events in the input file
+
+nNegEndcap = 0
+nPosEndcap = 0
 
 for event in range(evt_tree.GetEntries()):
     if event_break: break
@@ -86,6 +94,13 @@ for event in range(evt_tree.GetEntries()):
 
     if event % PRNT_EVT == 0: print('BDT.py: Processing Event #%d' % (event))
     evt_tree.GetEntry(event)
+
+
+    if(nNegEndcap > MAX_EVT/2 and evt_tree.genPart_eta[0] <= 0):
+        continue
+    elif(nPosEndcap > MAX_EVT/2 and evt_tree.genPart_eta[0] > 0):
+        continue
+
     #features per track that will be used as inputs to the BDT
     features = Compressor()
 
@@ -205,7 +220,10 @@ for event in range(evt_tree.GetEntries()):
         for k, v in features.items():
             print(k + " = " + str(v))
 
-    
+    if(evt_tree.genPart_eta[0] > 0):
+        nPosEndcap = nPosEndcap + 1
+    if(evt_tree.genPart_eta[0] <= 0):
+        nNegEndcap = nNegEndcap + 1
 
     x_ = {}
     for key in Run3TrainingVariables[str(MODE)]:
@@ -240,8 +258,16 @@ for event in range(evt_tree.GetEntries()):
     X = pd.concat([X,pd.DataFrame([x_])], ignore_index = True)
     Y = np.append(Y, log(evt_tree.genPart_pt[0]))
     W = np.append(W, 1. / log2(evt_tree.genPart_pt[0] + 0.000001))
+    Y_pt = np.append(Y_pt, evt_tree.genPart_pt[0])
+    Y_eta = np.append(Y_eta, evt_tree.genPart_eta[0])
+    Y_phi = np.append(Y_phi, evt_tree.genPart_phi[0])
+
 
 X_train, X_test, Y_train, Y_test, W_train, W_test = train_test_split(X, Y, W, test_size=.5, random_state=123)
+X_train_2, X_test_2, Y_train_pt, Y_test_pt, W_train_2, W_test_2 = train_test_split(X, Y_pt, W, test_size=.5, random_state=seed)
+X_train_2, X_test_2, Y_train_eta, Y_test_eta, W_train_2, W_test_2 = train_test_split(X, Y_eta, W, test_size=.5, random_state=seed)
+X_train_3, X_test_3, Y_train_phi, Y_test_phi, W_train_3, W_test_3 = train_test_split(X, Y_phi, W, test_size=.5, random_state=seed)
+
 dtrain = xgb.DMatrix(data = X_train, label = Y_train, weight = W_train)
 dtest = xgb.DMatrix(data = X_test, label = Y_test, weight = W_test)
 
@@ -267,11 +293,26 @@ h_pt_trg = TH1D('h_pt_num_EMTF',  '', len(scale_pt_temp)-1,  scale_pt)
 h_pt_2  = TH1D('h_pt_den_EMTF_2',  '', len(scale_pt_temp_2) - 1,  scale_pt_2)
 h_pt_trg_2 = TH1D('h_pt_num_EMTF_2',  '', len(scale_pt_temp_2)-1,  scale_pt_2)
 
+tree = TTree("TestTree","TestTree")
+
+pt_BDT = array('d', [0])
+pt_GEN = array('d', [0])
+eta_GEN = array('d', [0])
+phi_GEN = array('d', [0])
+tree.Branch('pt_BDT', pt_BDT, 'pt_BDT/D')
+tree.Branch('pt_GEN', pt_GEN, 'pt_GEN/D')
+tree.Branch('eta_GEN', eta_GEN, 'eta_GEN/D')
+tree.Branch('phi_GEN', phi_GEN, 'phi_GEN/D')
+
 preds = xg_reg.predict(X_test)
 for i, y in enumerate(Y_test):
     pt_real = exp(y)
     pt_pred = exp(preds[i])
-    
+    pt_BDT[0] = float(pt_pred)
+    pt_GEN[0] = float(pt_real)
+    eta_GEN[0] = float(Y_test_eta[i])
+    phi_GEN[0] = float(Y_test_phi[i])
+    tree.Fill()
     h_pt.Fill(pt_real)
     h_pt_2.Fill(pt_real)
     if pt_pred > 22:
