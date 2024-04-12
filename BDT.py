@@ -108,17 +108,17 @@ for event in range(evt_tree.GetEntries()):
     track = -1
     for select_track in range(evt_tree.emtfTrack_size):    
         mode = evt_tree.emtfTrack_mode[select_track]
-        if mode == MODE: 
+        if mode == MODE or mode == 15: 
             track = select_track
             break
     if track == -1: continue
-    features["mode"] = mode
+    features["mode"] = MODE #<-- either truely mode MODE or force to mode MODE
 
     #only accept the mode we want to train
-    if not mode == MODE: break
+    if not mode == MODE and not mode == 15: break
 
     #convert mode to station bit-array representation
-    station_isPresent = np.unpackbits(np.array([mode], dtype='>i8').view(np.uint8))[-4:]
+    station_isPresent = np.unpackbits(np.array([MODE], dtype='>i8').view(np.uint8))[-4:]
     
     #define station patterns
     station_pattern = []
