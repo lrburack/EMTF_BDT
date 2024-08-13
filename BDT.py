@@ -1,4 +1,4 @@
-from ROOT import * 
+from ROOT import TChain, TFile, TH1D, TTree 
 from subprocess import Popen, PIPE
 import numpy as np
 import os
@@ -12,19 +12,23 @@ import psutil
 from multiprocessing import Pool
 import argparse
 from to_TVMA import convert_model
+from math import log, sqrt, atan, pi, log2, exp, sqrt
+from array import array
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", "--num_jobs", required=False)
 parser.add_argument("-i", "--index", required = False)
 parser.add_argument("-m", "--mode", required = True)
+parser.add_argument("-nb", "--newbend", required = True)
 args = parser.parse_args()
 
 
 MODE = int(args.mode)
+USE_NEWBEND = int(args.newbend)
 print(MODE)
 
 MAX_FILE = 2 #20
-MAX_EVT = -1
+MAX_EVT = 10000
 DEBUG = False
 PRNT_EVT = 10000
 
@@ -189,7 +193,35 @@ for event in range(evt_tree.GetEntries()):
     if DEBUG and mode == MODE:
         for k, v in features.items():
             print(k + " = " + str(v))
+    
+    if (USE_NEWBEND and mode == 15):
+        hitref = eval('evt_tree.emtfTrack_hitref1[%d]' % (track))
+        if evt_tree.emtfHit_ring[hitref] == 1 and evt_tree.emtfHit_station[hitref] == 1: 
+            pt=evt_tree.genPart_pt[0]
+            me1phi = eval('evt_tree.emtfHit_emtf_phi[%d]' % (hitref))
+            sector = evt_tree.emtfHit_sector[hitref]
+            me1phi_CMS = (me1phi/60 -7 + (sector-1)*60)*pi/180
+            me1theta = eval('evt_tree.emtfHit_emtf_theta[%d]' % (hitref))*pi/180
+            me1eta = -log(atan(me1theta/2))
+        else: continue
 
+        dR=[]
+        ge1phi_CMSs = []
+        #if the hit was in GE11
+        for j in range(len(evt_tree.emtfHit_type)):
+            
+            if evt_tree.emtfHit_type[j] == 3:
+                ge1phi = eval('evt_tree.emtfHit_emtf_phi[%d]' % (j))
+                ge1phi_CMS = (ge1phi/60 - 7 + (sector-1)*60)*pi/180
+                ge1theta = eval('evt_tree.emtfHit_emtf_theta[%d]' % (j))*pi/180
+                ge1eta = -log(atan(ge1theta/2))
+                dr = sqrt((me1phi_CMS-ge1phi_CMS)**2 + (me1eta-ge1eta)**2)
+                ge1phi_CMSs.append(ge1phi_CMS)
+                dR.append(dr)
+        if (len(dR)>0 and  min(dR)<0.025):
+            features['bend_1'] = me1phi_CMS - ge1phi_CMSs[dR.index(min(dR))]
+
+            
     #print("\nCompressing...\n")
     features_precompressed = {k:v for k, v in features.items()}
     #features.compress()
@@ -262,6 +294,7 @@ for event in range(evt_tree.GetEntries()):
     Y_eta = np.append(Y_eta, evt_tree.genPart_eta[0])
     Y_phi = np.append(Y_phi, evt_tree.genPart_phi[0])
 
+seed = 1234
 
 X_train, X_test, Y_train, Y_test, W_train, W_test = train_test_split(X, Y, W, test_size=.5, random_state=123)
 X_train_2, X_test_2, Y_train_pt, Y_test_pt, W_train_2, W_test_2 = train_test_split(X, Y_pt, W, test_size=.5, random_state=seed)
