@@ -27,16 +27,15 @@ MODE = int(args.mode)
 USE_NEWBEND = int(args.newbend)
 print(MODE)
 
-MAX_FILE = 2 #20
-MAX_EVT = 10000
+MAX_FILE = 20
+MAX_EVT = 500000
 DEBUG = False
 PRNT_EVT = 10000
 
 #folders = ["/afs/cern.ch/user/n/nhurley/CMSSW_12_3_0/src/EMTF_MC_NTuple_SingleMu_new_neg.root", "/afs/cern.ch/user/n/nhurley/CMSSW_12_3_0/src/EMTF_MC_NTuple_SingleMu_pos_new.root"]
 #base_dirs = ["/eos/user/n/nhurley/SingleMu/SingleMuFlatOneOverPt1To1000GeV_Ntuple_fixed__negEndcap_v2/221215_114244/0000/", "/eos/user/n/nhurley/SingleMu/SingleMuFlatOneOverPt1To1000GeV_Ntuple_fixed__posEndcap_v2/221215_111111/"]
 
-base_dirs = ["/eos/cms/store/user/eyigitba/emtf/L1Ntuples/Run3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_negEndcap_13_3_1_BDT2024_noGEM_10M/240112_135506/0000/", "/eos/cms/store/user/eyigitba/emtf/L1Ntuples/Run3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_posEndcap_13_3_1_BDT2024_noGEM_10M/240112_152929/0000/"]
-
+base_dirs=["/eos/user/p/pakellin/RUN3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_negEndcap_14_0_12_BDT2024/240725_190959/0000/","/eos/user/p/pakellin/RUN3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_posEndcap_14_0_12_BDT2024/240726_145852/0000"]
 
 #station-station transitions for delta phi's and theta's
 transitions = ["12", "13", "14", "23", "24", "34"]
@@ -94,9 +93,14 @@ nPosEndcap = 0
 
 for event in range(evt_tree.GetEntries()):
     if event_break: break
-    if event == MAX_EVT: break
+    #if event == MAX_EVT: break
+    if event == MAX_EVT and nNegEndcap != 0 and nPosEndcap != 0: 
+        break
 
-    if event % PRNT_EVT == 0: print('BDT.py: Processing Event #%d' % (event))
+    if event % PRNT_EVT == 0:
+        print('BDT.py: Processing Event #%d' % (event))
+        print('Pos-Endcap',nPosEndcap)
+        print('Neg-Endcap',nNegEndcap)    
     evt_tree.GetEntry(event)
 
 
@@ -104,7 +108,6 @@ for event in range(evt_tree.GetEntries()):
         continue
     elif(nPosEndcap > MAX_EVT/2 and evt_tree.genPart_eta[0] > 0):
         continue
-
     #features per track that will be used as inputs to the BDT
     features = Compressor()
 
@@ -196,13 +199,14 @@ for event in range(evt_tree.GetEntries()):
     
     if (USE_NEWBEND and mode == 15):
         hitref = eval('evt_tree.emtfTrack_hitref1[%d]' % (track))
-        if evt_tree.emtfHit_ring[hitref] == 1 and evt_tree.emtfHit_station[hitref] == 1: 
+        if not evt_tree.emtfTrack_ptLUT_st1_ring2[track]: 
             pt=evt_tree.genPart_pt[0]
             me1phi = eval('evt_tree.emtfHit_emtf_phi[%d]' % (hitref))
             sector = evt_tree.emtfHit_sector[hitref]
             me1phi_CMS = (me1phi/60 -7 + (sector-1)*60)*pi/180
             me1theta = eval('evt_tree.emtfHit_emtf_theta[%d]' % (hitref))*pi/180
             me1eta = -log(atan(me1theta/2))
+            #print("here")
         else: continue
 
         dR=[]
@@ -336,7 +340,6 @@ tree.Branch('pt_BDT', pt_BDT, 'pt_BDT/D')
 tree.Branch('pt_GEN', pt_GEN, 'pt_GEN/D')
 tree.Branch('eta_GEN', eta_GEN, 'eta_GEN/D')
 tree.Branch('phi_GEN', phi_GEN, 'phi_GEN/D')
-
 preds = xg_reg.predict(X_test)
 for i, y in enumerate(Y_test):
     pt_real = exp(y)
@@ -351,6 +354,8 @@ for i, y in enumerate(Y_test):
     if pt_pred > 22:
         h_pt_trg.Fill(pt_real)
         h_pt_trg_2.Fill(pt_real)
+
+tree.Write()
 
 h_pt_trg.Divide(h_pt)
 h_pt_trg.Write()
