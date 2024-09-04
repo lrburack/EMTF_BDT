@@ -19,29 +19,32 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-n", "--num_jobs", required=False)
 parser.add_argument("-i", "--index", required = False)
 parser.add_argument("-m", "--mode", required = True)
-parser.add_argument("-nb", "--newbend", required = True)
+parser.add_argument("-nb", "--newbend", required = False, default=0)
+parser.add_argument("-s", "--showers", required = False, default=0) # Provide a number corresponding to the shower protocol
+parser.add_argument("-o", "--outpath", required = False, default="test.root")
 args = parser.parse_args()
-
 
 MODE = int(args.mode)
 USE_NEWBEND = int(args.newbend)
+SHOWER_PROTOCOL = int(args.showers)
+OUTPATH = str(args.outpath)
 print(MODE)
 
-MAX_FILE = 20
-MAX_EVT = 500000
+MAX_FILE = 2
+MAX_EVT = 500
 DEBUG = False
 PRNT_EVT = 10000
 
 #folders = ["/afs/cern.ch/user/n/nhurley/CMSSW_12_3_0/src/EMTF_MC_NTuple_SingleMu_new_neg.root", "/afs/cern.ch/user/n/nhurley/CMSSW_12_3_0/src/EMTF_MC_NTuple_SingleMu_pos_new.root"]
 #base_dirs = ["/eos/user/n/nhurley/SingleMu/SingleMuFlatOneOverPt1To1000GeV_Ntuple_fixed__negEndcap_v2/221215_114244/0000/", "/eos/user/n/nhurley/SingleMu/SingleMuFlatOneOverPt1To1000GeV_Ntuple_fixed__posEndcap_v2/221215_111111/"]
-
-base_dirs=["/eos/user/p/pakellin/RUN3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_negEndcap_14_0_12_BDT2024/240725_190959/0000/","/eos/user/p/pakellin/RUN3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_posEndcap_14_0_12_BDT2024/240726_145852/0000"]
+# base_dirs = ["/eos/cms/store/user/eyigitba/emtf/L1Ntuples/Run3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_negEndcap_13_3_1_BDT2024_noGEM_10M/240112_135506/0000/", "/eos/cms/store/user/eyigitba/emtf/L1Ntuples/Run3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_posEndcap_13_3_1_BDT2024_noGEM_10M/240112_152929/0000/"]
+# base_dirs=["/eos/user/p/pakellin/RUN3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_negEndcap_14_0_12_BDT2024/240725_190959/0000/","/eos/user/p/pakellin/RUN3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_posEndcap_14_0_12_BDT2024/240726_145852/0000"]
+base_dirs=["/eos/user/p/pakellin/RUN3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_posEndcap_14_0_12_BDT2024/240826_193940/0000", "/eos/user/p/pakellin/RUN3/crabOut/CRAB_PrivateMC/SingleMuGun_flatOneOverPt1to1000_negEndcap_14_0_12_BDT2024/240826_193901/0000"]
 
 #station-station transitions for delta phi's and theta's
 transitions = ["12", "13", "14", "23", "24", "34"]
 #modes we want to analyze
 EMTF_MODES = [15, 14, 13, 12, 11, 10, 9, 7, 6, 5, 3]
-
 
 features_collection = []
 
@@ -54,6 +57,7 @@ station_transition_map = {
             4: [2, 4, 5]}
 
 evt_tree  = TChain('EMTFNtuple/tree')
+shower_tree  = TChain('MuShowerNtuple/tree')
 
 #recursivelh access different subdirectories of given folder from above
 file_list = []
@@ -69,6 +73,7 @@ for base_dir in base_dirs:
             nFiles   += 1
             print ('* Loading file #%s: %s' % (nFiles, file))
             evt_tree.Add(file_name)
+            shower_tree.Add(file_name)
             if nFiles >= MAX_FILE/2: break_loop = True
 
 
@@ -102,7 +107,10 @@ for event in range(evt_tree.GetEntries()):
         print('Pos-Endcap',nPosEndcap)
         print('Neg-Endcap',nNegEndcap)    
     evt_tree.GetEntry(event)
+    shower_tree.GetEntry(event)
 
+    # if evt_tree.emtfTrack_size != 1:
+    #     continue
 
     if(nNegEndcap > MAX_EVT/2 and evt_tree.genPart_eta[0] <= 0):
         continue
@@ -127,6 +135,46 @@ for event in range(evt_tree.GetEntries()):
     #convert mode to station bit-array representation
     station_isPresent = np.unpackbits(np.array([MODE], dtype='>i8').view(np.uint8))[-4:]
     
+    # This code block matches showers with hits along the track
+    # This array contains the shower information. The first axis corresponds to the station, the second axis corresponds to the shower type (0: loose, 1: nominal, 2: tight)
+    showers_on_track = np.zeros((4, 3), dtype='bool')
+    # Loop through each hit. We will check for a corresponding shower
+    for station in range(4):
+        if not station_isPresent[station]:
+            continue
+        
+        # Each track could have a hit in each station. hitref is used to associate hit information with a partiuclar hit in a track 
+        # emtfTrack_hitref<i>[j] tells you where to find information about a hit in station i for track j 
+        hitref = getattr(evt_tree, "emtfTrack_hitref" + str(station + 1))[track]
+
+        # Loop through each shower and see if it corresponds to a hit in the track
+        for i in range(shower_tree.CSCShowerDigiSize):
+            # Check that the hit location matches the shower location
+            if (evt_tree.emtfHit_chamber[hitref] == shower_tree.CSCShowerDigi_chamber[i] and 
+                evt_tree.emtfHit_ring[hitref] == shower_tree.CSCShowerDigi_ring[i] and 
+                evt_tree.emtfHit_station[hitref] == shower_tree.CSCShowerDigi_station[i] and 
+                evt_tree.emtfHit_endcap[hitref] == shower_tree.CSCShowerDigi_endcap[i]):
+                # Add the shower information to the array
+                showers_on_track[station, :] = np.array([shower_tree.CSCShowerDigi_oneLoose[i], shower_tree.CSCShowerDigi_oneNominal[i], shower_tree.CSCShowerDigi_oneTight[i]]).T
+
+    if SHOWER_PROTOCOL == 1:
+        for station in range(4):
+            if not station_isPresent[station]:
+                continue 
+            features["looseShower_" + str(station)] = showers_on_track[station][0]
+            features["nominalShower_" + str(station)] = showers_on_track[station][1]
+            features["tightShower_" + str(station)] = showers_on_track[station][2]
+    if SHOWER_PROTOCOL == 2:
+        features["looseShowerCount"] = np.sum(showers_on_track[:,0])
+    if SHOWER_PROTOCOL == 3:
+        features["nominalShowerCount"] = np.sum(showers_on_track[:,1])
+    if SHOWER_PROTOCOL == 4:
+        features["tightShowerCount"] = np.sum(showers_on_track[:,2])
+    if SHOWER_PROTOCOL == 5:
+        features["showerBit"] = int(shower_tree.CSCShowerDigiSize >= 1)
+    if SHOWER_PROTOCOL == 6:
+        features["showerBit"] = int(shower_tree.CSCShowerDigiSize >= 2)
+
     #define station patterns
     station_pattern = []
     for station in range(4):
@@ -262,6 +310,12 @@ for event in range(evt_tree.GetEntries()):
         nNegEndcap = nNegEndcap + 1
 
     x_ = {}
+
+    # Add all the features that contain the word shower to x_
+    for key in features.keys():
+        if "shower" in key.lower():
+            x_[key] = features[key]
+
     for key in Run3TrainingVariables[str(MODE)]:
         x_[key] = features[key]
     if DEBUG:
@@ -318,8 +372,8 @@ xg_reg = xgb.XGBRegressor(objective = 'reg:linear',
 xg_reg.fit(X_train, Y_train, sample_weight = W_train)
 
 
-try: outfile = TFile("./test.root", 'recreate')
-except: outfile = TFile("./test.root", 'create')
+try: outfile = TFile(OUTPATH, 'recreate')
+except: outfile = TFile(OUTPATH, 'create')
 scale_pt_temp = [0, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20, 22, 25, 30, 35, 45, 60, 75, 100, 140, 160, 180, 200, 250, 300, 500, 1000] #high-pt range
 scale_pt_temp_2 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 55, 60] #low-pt range
 scale_pt_2  = np.array(scale_pt_temp_2, dtype = 'float64')
@@ -368,6 +422,6 @@ rmse = np.sqrt(mean_squared_error(Y_test, preds))
 
 print("RMSE: %f" % (rmse))
 
-#input_vars = [(x, 'I') for x in X.head()]
-#for idx, tree in enumerate(xg_reg.get_booster().get_dump()):
+# input_vars = [(x, 'I') for x in X.head()]
+# for idx, tree in enumerate(xg_reg.get_booster().get_dump()):
 #    convert_model([tree],itree = idx,input_variables = input_vars, output_xml=f'/afs/cern.ch/user/n/nhurley/BDT/{MODE}/{idx}.xml')
