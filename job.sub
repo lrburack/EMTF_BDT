@@ -1,7 +1,7 @@
 executable            = /afs/cern.ch/user/l/lburack/work/BDTdev/EMTF_BDT/job.sh
-arguments             = $(ClusterId) $(ProcId)
-output                = Results/output/hello.$(ClusterId).$(ProcId).out
-error                 = Results/error/hello.$(ClusterId).$(ProcId).err
-log                   = Results/log/hello.$(ClusterId).log
-+JobFlavour = "workday"
-queue
+arguments             = $(ClusterId) $(ProcId) $(name) $(mode) $(newbend) $(shower)
+output                = Results/$(name)/output/hello.$(ClusterId).$(ProcId).out
+error                 = Results/$(name)/error/hello.$(ClusterId).$(ProcId).err
+log                   = Results/$(name)/log/hello.$(ClusterId).log
++JobFlavour           = "workday"
+queue name, mode, newbend, shower from arguments.txt

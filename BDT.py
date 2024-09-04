@@ -14,6 +14,7 @@ import argparse
 from to_TVMA import convert_model
 from math import log, sqrt, atan, pi, log2, exp, sqrt
 from array import array
+import pickle
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", "--num_jobs", required=False)
@@ -21,17 +22,22 @@ parser.add_argument("-i", "--index", required = False)
 parser.add_argument("-m", "--mode", required = True)
 parser.add_argument("-nb", "--newbend", required = False, default=0)
 parser.add_argument("-s", "--showers", required = False, default=0) # Provide a number corresponding to the shower protocol
-parser.add_argument("-o", "--outpath", required = False, default="test.root")
+parser.add_argument("-o", "--outpath", required = False, default="")
 args = parser.parse_args()
 
 MODE = int(args.mode)
 USE_NEWBEND = int(args.newbend)
 SHOWER_PROTOCOL = int(args.showers)
 OUTPATH = str(args.outpath)
-print(MODE)
 
-MAX_FILE = 2
-MAX_EVT = 500
+if OUTPATH != "" and OUTPATH[-1] != "/":
+    OUTPATH += "/"
+
+print("Arguments: ")
+print(args)
+
+MAX_FILE = 20
+MAX_EVT = 500000
 DEBUG = False
 PRNT_EVT = 10000
 
@@ -161,9 +167,9 @@ for event in range(evt_tree.GetEntries()):
         for station in range(4):
             if not station_isPresent[station]:
                 continue 
-            features["looseShower_" + str(station)] = showers_on_track[station][0]
-            features["nominalShower_" + str(station)] = showers_on_track[station][1]
-            features["tightShower_" + str(station)] = showers_on_track[station][2]
+            features["looseShower_" + str(station + 1)] = showers_on_track[station][0]
+            features["nominalShower_" + str(station + 1)] = showers_on_track[station][1]
+            features["tightShower_" + str(station + 1)] = showers_on_track[station][2]
     if SHOWER_PROTOCOL == 2:
         features["looseShowerCount"] = np.sum(showers_on_track[:,0])
     if SHOWER_PROTOCOL == 3:
@@ -354,6 +360,11 @@ for event in range(evt_tree.GetEntries()):
 
 seed = 1234
 
+print("----------------------------------------------------------------------")
+print("Training on:")
+print(x_.keys())
+print("----------------------------------------------------------------------")
+
 X_train, X_test, Y_train, Y_test, W_train, W_test = train_test_split(X, Y, W, test_size=.5, random_state=123)
 X_train_2, X_test_2, Y_train_pt, Y_test_pt, W_train_2, W_test_2 = train_test_split(X, Y_pt, W, test_size=.5, random_state=seed)
 X_train_2, X_test_2, Y_train_eta, Y_test_eta, W_train_2, W_test_2 = train_test_split(X, Y_eta, W, test_size=.5, random_state=seed)
@@ -372,8 +383,8 @@ xg_reg = xgb.XGBRegressor(objective = 'reg:linear',
 xg_reg.fit(X_train, Y_train, sample_weight = W_train)
 
 
-try: outfile = TFile(OUTPATH, 'recreate')
-except: outfile = TFile(OUTPATH, 'create')
+try: outfile = TFile(OUTPATH + "test.root", 'recreate')
+except: outfile = TFile(OUTPATH + "test.root", 'create')
 scale_pt_temp = [0, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20, 22, 25, 30, 35, 45, 60, 75, 100, 140, 160, 180, 200, 250, 300, 500, 1000] #high-pt range
 scale_pt_temp_2 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 55, 60] #low-pt range
 scale_pt_2  = np.array(scale_pt_temp_2, dtype = 'float64')
@@ -419,6 +430,18 @@ h_pt_trg_2.Write()
 del outfile
 
 rmse = np.sqrt(mean_squared_error(Y_test, preds))
+
+print("----------------------------------------------------------------------")
+# Get feature importances using the feature_importances_ attribute
+feature_importances = xg_reg.feature_importances_
+print("Feature importances using feature_importances_ attribute:")
+for name, importance in zip(x_.keys(), feature_importances):
+    print(f"{name}: {importance}")
+print("----------------------------------------------------------------------")
+
+# Save the model to a file using pickle
+with open(OUTPATH + 'xgb_model.pkl', 'wb') as file:
+    pickle.dump(xg_reg, file)
 
 print("RMSE: %f" % (rmse))
 
