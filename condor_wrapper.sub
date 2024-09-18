@@ -1,0 +1,7 @@
+executable            = $(code_directory)/condor_wrapper.sh
+arguments             = $(code_directory) $(results_directory) $(name)
+output                = $(results_directory)/$(name)/build_dataset.out
+error                 = $(results_directory)/$(name)/build_dataset.err
+log                   = $(results_directory)/$(name)/build_dataset.log
++JobFlavour           = "espresso"
+queue
