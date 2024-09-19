@@ -1,11 +1,3 @@
-# We want to be able to quickly test many different input schemes for the BDT
-# The biggest improvements in this code are:
-# 1. Modularity making it easy to create diverse BDT trainings without adding if statements in multiple places
-# 2. Speed. 
-#   a. Using a numpy array rather than a pandas dictionary. 
-#   b. Accessing root attributes directly rather than with strings.
-#   c. Caching references and reused information, and preallocating memory.
-
 import os
 import ROOT
 import numpy as np
