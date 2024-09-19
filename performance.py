@@ -22,7 +22,6 @@ def getEfficiciencyHist(num_binned, den_binned):
              efficiency_binned - TYPE: numpy array-like
              efficiency_binned_err - TYPE: [numpy array-like, numpy array-like]
        
-       
     """
     # Initializing binned data
     efficiency_binned = np.array([])
@@ -64,7 +63,7 @@ def getEfficiciencyHist(num_binned, den_binned):
 
     return efficiency_binned, efficiency_binned_err
 
-names = np.array(["lxplus_test2"])
+names = np.array(["Tests/like_previous_code"])
 
 pt_cut = 22
 

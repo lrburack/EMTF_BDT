@@ -5,11 +5,21 @@ import os
 import numpy as np
 from helpers import get_by_name, get_trainable, permute_together
 
-dataset_name = "lxplus_test2"
+test_train_split = 250000
+
+# ----------------------------------- Train -----------------------------------
+dataset_name = "Tests/like_previous_code"
 dataset = get_by_name(dataset_name, config.WRAPPER_DICT_NAME)['training_data_builder']
 
-training_data, train_pt, event_weight, filtered_data = get_trainable(dataset)
-permute_together(training_data, train_pt, event_weight, filtered_data)
+trainable_data, trainable_pt, trainable_event_weight, trainable_filtered_data = get_trainable(dataset)
+permute_together(trainable_data, trainable_pt, trainable_event_weight, trainable_filtered_data)
+
+# training_data = trainable_data
+# train_pt = trainable_pt
+# event_weight = trainable_event_weight
+training_data = trainable_data[:test_train_split]
+train_pt = trainable_pt[:test_train_split]
+event_weight = trainable_event_weight[:test_train_split]
 
 xg_reg = xgb.XGBRegressor(objective = 'reg:linear', 
                         learning_rate = .1, 
@@ -18,9 +28,7 @@ xg_reg = xgb.XGBRegressor(objective = 'reg:linear',
                         max_bins = 1000,
                         nthread = 30)
 
-train_count = 25000
-
-xg_reg.fit(training_data[:train_count], train_pt[:train_count], sample_weight = event_weight[:train_count])
+xg_reg.fit(training_data, train_pt, sample_weight = event_weight)
 
 model_path = os.path.join(config.RESULTS_DIRECTORY, dataset_name, config.MODEL_NAME)
 with open(model_path, 'wb') as file:
@@ -33,14 +41,23 @@ for name, importance in zip(np.array(dataset.feature_names)[dataset.trainable_fe
 print("\n")
 print("------------------------------------------------------------------------------")
 
-predicted_pt = np.exp(xg_reg.predict(training_data[train_count:]))
+
+# ----------------------------------- Predict -----------------------------------
+# dataset_name = "Tests/shower_bit_wrong_distribution"
+# dataset = get_by_name(dataset_name, config.WRAPPER_DICT_NAME)['training_data_builder']
+# testing_data, testing_pt, _, testing_filtered_data = get_trainable(dataset)
+
+testing_data = trainable_data[test_train_split:]
+testing_filtered_data = trainable_filtered_data[test_train_split:]
+
+predicted_pt = np.exp(xg_reg.predict(testing_data))
 
 test_dict = {
     "predicted_pt"      : predicted_pt,
     "training_features" : np.array(dataset.feature_names)[dataset.trainable_features],
-    "testing_data"      : training_data[train_count:],
+    "testing_data"      : testing_data,
     "gen_features"      : np.array(dataset.feature_names)[~dataset.trainable_features],
-    "gen_data"          : filtered_data[train_count:][:, ~dataset.trainable_features]
+    "gen_data"          : testing_filtered_data[:, ~dataset.trainable_features]
 }
 
 prediction_path = os.path.join(config.RESULTS_DIRECTORY, dataset_name, config.PREDICTION_NAME)
