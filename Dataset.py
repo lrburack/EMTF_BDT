@@ -41,7 +41,7 @@ def get_station_presence(mode):
 def transitions_from_mode(mode):
     # In the EMTFNtuple, dPhi and dTheta are 2D arrays. The first dimension is track. The second dimension is a 'transition index'
     # This transition index can be read as the index in this array: ["12", "13", "14", "23", "24", "34"]
-    # For a particular mode, we want to know which of these transitions exists. This clever little array operation will get us this
+    # For a particular mode, we want to know which of these transitions exist. This clever little array operation will get us this
     station_presence = get_station_presence(mode)
     return np.where(np.outer(station_presence, station_presence)[np.logical_not(np.tri(4))])[0]
 
@@ -114,7 +114,7 @@ class SharedInfo:
         
         # hitref is used to associate hit information with a partiuclar hit in a track 
         # emtfTrack_hitref<i>[j] tells you where to find information about a hit in station i for track j
-        # Yes, this is ugly, however for performance its quite important to eliminate the use of strings for indexing the root file
+        # Yes, this is ugly, however for performance its important to eliminate the use of strings for indexing the root file
         if self.station_presence[0]:
             self.hitrefs[0] = event['EMTFNtuple'].emtfTrack_hitref1[self.track]
         if self.station_presence[1]:
